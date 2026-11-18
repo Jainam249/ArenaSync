@@ -257,7 +257,7 @@ Arenasync/
 │   │   │   ├── SponsorDashboard.jsx# Sponsor brand management
 │   │   │   └── TournamentDetails.jsx# Detailed tournament overview
 │   │   ├── services/               # Razorpay & API client wrappers
-│   │   ├── statics/                # CSS modules & styling assets
+│   │   ├── static/                 # CSS modules & styling assets
 │   │   ├── utils/                  # axiosConfig, socket connection & validators
 │   │   ├── App.jsx                 # Master application routing
 │   │   ├── main.jsx                # React DOM entry point

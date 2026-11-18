@@ -1,0 +1,15 @@
+{
+  "name": "arenasync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ArenaSync - Real-Time Sports Tournament & Arena Management Platform",
+  "scripts": {
+    "install:all": "npm --prefix Backend install && npm --prefix Frontend install",
+    "build": "npm --prefix Frontend run build",
+    "build:frontend": "npm --prefix Frontend run build",
+    "start:backend": "npm --prefix Backend start",
+    "dev:backend": "npm --prefix Backend run dev 2>nul || npm --prefix Backend start",
+    "dev:frontend": "npm --prefix Frontend run dev",
+    "preview:frontend": "npm --prefix Frontend run preview"
+  }
+}

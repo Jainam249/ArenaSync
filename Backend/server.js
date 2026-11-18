@@ -1,7 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const dns = require("dns");
 require("dotenv").config();
+
+// Configure DNS to use Google and Cloudflare DNS to prevent SRV lookup timeouts on Windows/local networks
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (e) {
+  // Fallback to system default if setting custom servers is restricted
+}
 
 const http = require("http");
 const { Server } = require("socket.io");
@@ -144,9 +152,22 @@ app.get("/health", (req, res) => {
 
 /* ================= DATABASE ================= */
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+  })
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err));
+  .catch((err) => {
+    console.error("❌ MongoDB Connection Error:", err.message);
+    if (err.name === "MongooseServerSelectionError") {
+      console.error(
+        "\n💡 [Atlas Whitelist Required]: Your IP address must be allowed in MongoDB Atlas:\n" +
+        "   1. Go to https://cloud.mongodb.com\n" +
+        "   2. Under 'Security', click 'Network Access'\n" +
+        "   3. Click 'Add IP Address' -> 'Add Current IP Address' (or '0.0.0.0/0' to allow access from anywhere)\n" +
+        "   4. Click 'Confirm' and wait 1 minute for it to become Active.\n"
+      );
+    }
+  });
 
 /* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {

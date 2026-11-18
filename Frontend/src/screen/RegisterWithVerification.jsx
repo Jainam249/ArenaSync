@@ -111,7 +111,7 @@ export default function RegisterWithVerification() {
     
     setIsEmailChecking(true);
     try {
-      const res = await axios.post(API_URL + "/check-email", { email });
+      const res = await axios.post(API_URL + "/check-email", { email }, { timeout: 8000 });
       if (!res.data.available) {
         setErrors(prev => ({ ...prev, email: "Email already registered. Please use a different email." }));
         setEmailAvailable(false);
@@ -144,7 +144,7 @@ export default function RegisterWithVerification() {
     try {
       const res = await axios.post(API_URL + "/send-email-otp", {
         email: formData.email
-      });
+      }, { timeout: 15000 });
       setOtpSent(true);
       setTimeLeft(300); // 5 minutes
       setOtpMessage(res.data.message || "OTP sent successfully!");
@@ -168,7 +168,7 @@ export default function RegisterWithVerification() {
       await axios.post(API_URL + "/verify-email-otp", {
         email: formData.email,
         otp: verificationCode
-      });
+      }, { timeout: 10000 });
       setIsEmailVerified(true);
       setOtpMessage("Email verified successfully!");
     } catch (err) {
@@ -267,7 +267,7 @@ export default function RegisterWithVerification() {
             {errors.email && (touched.email || !emailAvailable) && (
               <span className="error-text">{errors.email}</span>
             )}
-            {!errors.email && emailAvailable && formData.email && touched.email && !isEmailVerified && !otpSent && (
+            {!isEmailChecking && !errors.email && emailAvailable && formData.email && touched.email && !isEmailVerified && !otpSent && (
               <span className="success-text">✓ Email available</span>
             )}
             {isEmailVerified && (
@@ -286,9 +286,9 @@ export default function RegisterWithVerification() {
                       className="resend-btn"
                       style={{ margin: 0, width: '100%', height: '40px' }}
                       onClick={handleSendOtp}
-                      disabled={loadingOtp || isEmailChecking}
+                      disabled={loadingOtp || isEmailChecking || !emailAvailable}
                     >
-                      {loadingOtp ? "Sending OTP..." : "Send Verification OTP"}
+                      {loadingOtp ? "Sending OTP..." : isEmailChecking ? "Checking email..." : "Send Verification OTP"}
                     </button>
                   ) : (
                     <div>

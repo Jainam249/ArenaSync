@@ -23,6 +23,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:5173",
   "https://arenasync-tau.vercel.app",
+  "https://arena-sync-iota.vercel.app",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 

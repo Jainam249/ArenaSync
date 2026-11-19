@@ -41,167 +41,173 @@ const corsOptionsOrigin = (origin, callback) => {
   if (!origin) return callback(null, true);
 
   const cleanOrigin = normalizeOrigin(origin);
-  const isAllowed = allowedOrigins.some(allowed => normalizeOrigin(allowed) === cleanOrigin);
 
-  if (isAllowed) {
-    callback(null, true);
-  } else {
-    // Log the rejected origin safely for diagnostics
-    console.log(`[CORS] Rejected CORS origin: ${origin}`);
-    callback(null, false); // Safely reject without throwing a 500 error in Express
-  }
-};
+  // 1. Check explicit matches from allowedOrigins
+  const isExplicit = allowedOrigins.some(allowed => normalizeOrigin(allowed) === cleanOrigin);
+  // 2. Allow all Vercel domains (production & preview URLs like *.vercel.app)
+  const isVercel = /\.vercel\.app$/i.test(cleanOrigin);
+  // 3. Allow local dev environments
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleanOrigin);
 
-/* ================= SOCKET.IO ================= */
-const io = new Server(server, {
-  cors: {
-    origin: corsOptionsOrigin,
-    credentials: true,
-  },
-});
+    if (isExplicit || isVercel || isLocal) {
+      callback(null, true);
+    } else {
+      // Log the rejected origin safely for diagnostics
+      console.log(`[CORS] Rejected CORS origin: ${origin}`);
+      callback(null, false); // Safely reject without throwing a 500 error in Express
+    }
+  };
 
-// 🔥 Store connected users
-let users = {};
-
-io.on("connection", (socket) => {
-  console.log("🔌 User connected:", socket.id);
-
-  // Register user
-  socket.on("register", (userId) => {
-    users[userId] = socket.id;
-    console.log("✅ User registered:", userId);
+  /* ================= SOCKET.IO ================= */
+  const io = new Server(server, {
+    cors: {
+      origin: corsOptionsOrigin,
+      credentials: true,
+    },
   });
 
-  // Register for analytics updates
-  socket.on("register-analytics", (data) => {
-    console.log("📊 Analytics registered for user:", data?.userId || "unknown");
-    socket.join("analytics-room");
-  });
+  // 🔥 Store connected users
+  let users = {};
 
-  socket.on("disconnect", () => {
-    console.log("❌ User disconnected:", socket.id);
+  io.on("connection", (socket) => {
+    console.log("🔌 User connected:", socket.id);
 
-    for (let userId in users) {
-      if (users[userId] === socket.id) {
-        delete users[userId];
+    // Register user
+    socket.on("register", (userId) => {
+      users[userId] = socket.id;
+      console.log("✅ User registered:", userId);
+    });
+
+    // Register for analytics updates
+    socket.on("register-analytics", (data) => {
+      console.log("📊 Analytics registered for user:", data?.userId || "unknown");
+      socket.join("analytics-room");
+    });
+
+    socket.on("disconnect", () => {
+      console.log("❌ User disconnected:", socket.id);
+
+      for (let userId in users) {
+        if (users[userId] === socket.id) {
+          delete users[userId];
+        }
       }
+    });
+  });
+
+  // 🔥 make available in routes
+  app.set("io", io);
+  app.set("users", users);
+
+  /* ================= CORS ================= */
+  app.use(
+    cors({
+      origin: corsOptionsOrigin,
+      credentials: true,
+      allowedHeaders: ["Content-Type", "Authorization"],
+      methods: ["GET", "POST", "PUT", "DELETE"],
+    })
+  );
+
+  /* ================= MIDDLEWARE ================= */
+  app.use(express.json());
+
+  /* ================= ROUTES ================= */
+  app.use("/api", require("./routes/auth"));
+  app.use("/api/profile", require("./routes/profile"));
+
+  app.use("/api/users", require("./routes/userRouter"));
+  app.use("/api/sports", require("./routes/sportRouter"));
+  app.use("/api/teams", require("./routes/teamRouter"));
+  app.use("/api/tournaments", require("./routes/tournamentRoutes"));
+  app.use("/api/matches", require("./routes/matchRouter"));
+  app.use("/api/registrations", require("./routes/registrationRouter"));
+  app.use("/api/venues", require("./routes/venueRouter"));
+  app.use("/api/sponsors", require("./routes/sponsorRouter"));
+
+  app.use("/api/notifications", require("./routes/notificationRouter"));
+  app.use("/api/payments", require("./routes/paymentRoutes"));
+  app.use("/api/prize-distributions", require("./routes/prizeDistributionRouter"));
+
+  // Analytics Routes - Real-time dashboard stats
+  app.use("/api/analytics", require("./routes/analyticsRouter"));
+
+  const { getSchedule } = require("./controllers/matchController");
+  const { blockOrganizerJoin } = require("./controllers/teamController");
+
+  // Schedule shortcut endpoint
+  app.get("/api/schedule", require("./middleware/authMiddleware"), getSchedule);
+
+  // Block organizer from joining team (fallback /api/join-team check)
+  app.post("/api/join-team", require("./middleware/authMiddleware"), blockOrganizerJoin);
+
+  app.use("/uploads", express.static("uploads"));
+
+  /* ================= TEST ROUTE ================= */
+  app.get("/", (req, res) => {
+    res.send("Backend is running 🚀");
+  });
+
+  // Health check endpoint
+  app.get("/health", (req, res) => {
+    res.json({
+      status: "healthy",
+      mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  /* ================= DATABASE ================= */
+  mongoose
+    .connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+    })
+    .then(() => console.log("✅ MongoDB Connected"))
+    .catch((err) => {
+      console.error("❌ MongoDB Connection Error:", err.message);
+      if (err.name === "MongooseServerSelectionError") {
+        console.error(
+          "\n💡 [Atlas Whitelist Required]: Your IP address must be allowed in MongoDB Atlas:\n" +
+          "   1. Go to https://cloud.mongodb.com\n" +
+          "   2. Under 'Security', click 'Network Access'\n" +
+          "   3. Click 'Add IP Address' -> 'Add Current IP Address' (or '0.0.0.0/0' to allow access from anywhere)\n" +
+          "   4. Click 'Confirm' and wait 1 minute for it to become Active.\n"
+        );
+      }
+    });
+
+  /* ================= ERROR HANDLER ================= */
+  app.use((err, req, res, next) => {
+    console.error("UNHANDLED ERROR:", err);
+
+    if (err && err.name === "MulterError") {
+      return res.status(400).json({ message: err.message });
     }
-  });
-});
 
-// 🔥 make available in routes
-app.set("io", io);
-app.set("users", users);
-
-/* ================= CORS ================= */
-app.use(
-  cors({
-    origin: corsOptionsOrigin,
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  })
-);
-
-/* ================= MIDDLEWARE ================= */
-app.use(express.json());
-
-/* ================= ROUTES ================= */
-app.use("/api", require("./routes/auth"));
-app.use("/api/profile", require("./routes/profile"));
-
-app.use("/api/users", require("./routes/userRouter"));
-app.use("/api/sports", require("./routes/sportRouter"));
-app.use("/api/teams", require("./routes/teamRouter"));
-app.use("/api/tournaments", require("./routes/tournamentRoutes"));
-app.use("/api/matches", require("./routes/matchRouter"));
-app.use("/api/registrations", require("./routes/registrationRouter"));
-app.use("/api/venues", require("./routes/venueRouter"));
-app.use("/api/sponsors", require("./routes/sponsorRouter"));
-
-app.use("/api/notifications", require("./routes/notificationRouter"));
-app.use("/api/payments", require("./routes/paymentRoutes"));
-app.use("/api/prize-distributions", require("./routes/prizeDistributionRouter"));
-
-// Analytics Routes - Real-time dashboard stats
-app.use("/api/analytics", require("./routes/analyticsRouter"));
-
-const { getSchedule } = require("./controllers/matchController");
-const { blockOrganizerJoin } = require("./controllers/teamController");
-
-// Schedule shortcut endpoint
-app.get("/api/schedule", require("./middleware/authMiddleware"), getSchedule);
-
-// Block organizer from joining team (fallback /api/join-team check)
-app.post("/api/join-team", require("./middleware/authMiddleware"), blockOrganizerJoin);
-
-app.use("/uploads", express.static("uploads"));
-
-/* ================= TEST ROUTE ================= */
-app.get("/", (req, res) => {
-  res.send("Backend is running 🚀");
-});
-
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-    timestamp: new Date().toISOString()
-  });
-});
-
-/* ================= DATABASE ================= */
-mongoose
-  .connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-  })
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err.message);
-    if (err.name === "MongooseServerSelectionError") {
-      console.error(
-        "\n💡 [Atlas Whitelist Required]: Your IP address must be allowed in MongoDB Atlas:\n" +
-        "   1. Go to https://cloud.mongodb.com\n" +
-        "   2. Under 'Security', click 'Network Access'\n" +
-        "   3. Click 'Add IP Address' -> 'Add Current IP Address' (or '0.0.0.0/0' to allow access from anywhere)\n" +
-        "   4. Click 'Confirm' and wait 1 minute for it to become Active.\n"
-      );
+    // Handle validation errors
+    if (err && err.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
     }
+
+    // Handle Mongoose Cast Error (e.g. invalid ObjectId)
+    if (err && err.name === "CastError") {
+      return res.status(400).json({ message: `Invalid ID format for path: ${err.path}` });
+    }
+
+    // Handle duplicate key errors
+    if (err && err.code === 11000) {
+      return res.status(400).json({ message: "Duplicate entry found" });
+    }
+
+    res.status(500).json({ message: err.message || "Internal Server Error" });
   });
 
-/* ================= ERROR HANDLER ================= */
-app.use((err, req, res, next) => {
-  console.error("UNHANDLED ERROR:", err);
+  /* ================= START SERVER ================= */
+  const PORT = process.env.PORT || 5000;
 
-  if (err && err.name === "MulterError") {
-    return res.status(400).json({ message: err.message });
-  }
-
-  // Handle validation errors
-  if (err && err.name === "ValidationError") {
-    return res.status(400).json({ message: err.message });
-  }
-
-  // Handle Mongoose Cast Error (e.g. invalid ObjectId)
-  if (err && err.name === "CastError") {
-    return res.status(400).json({ message: `Invalid ID format for path: ${err.path}` });
-  }
-
-  // Handle duplicate key errors
-  if (err && err.code === 11000) {
-    return res.status(400).json({ message: "Duplicate entry found" });
-  }
-
-  res.status(500).json({ message: err.message || "Internal Server Error" });
-});
-
-/* ================= START SERVER ================= */
-const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Frontend URL: http://localhost:5173`);
-  console.log(`📡 Socket.IO ready for real-time updates`);
-  console.log(`📊 Analytics endpoint: http://localhost:${PORT}/api/analytics/stats`);
-});
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📍 Frontend URL: http://localhost:5173`);
+    console.log(`📡 Socket.IO ready for real-time updates`);
+    console.log(`📊 Analytics endpoint: http://localhost:${PORT}/api/analytics/stats`);
+  });

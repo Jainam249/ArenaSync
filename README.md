@@ -8,8 +8,13 @@
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--Time-010101?style=for-the-badge&logo=socketdotio&logoColor=white)](https://socket.io/)
 [![Razorpay](https://img.shields.io/badge/Razorpay-Payment%20Gateway-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)](https://razorpay.com/)
 [![Cloudinary](https://img.shields.io/badge/Cloudinary-Media%20Cloud-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)](https://cloudinary.com/)
+[![Vercel](https://img.shields.io/badge/Frontend-Live%20on%20Vercel-black?style=for-the-badge&logo=vercel&logoColor=white)](https://arena-sync-iota.vercel.app/)
+[![Render](https://img.shields.io/badge/Backend-Live%20on%20Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://arenasync-reel.onrender.com)
 [![License](https://img.shields.io/badge/License-ISC-blue?style=for-the-badge)](LICENSE)
 
+> 🌐 **Live Web Application**: [https://arena-sync-iota.vercel.app](https://arena-sync-iota.vercel.app)  
+> 📡 **Live Production API**: [https://arenasync-reel.onrender.com](https://arenasync-reel.onrender.com)  
+> 
 > **ArenaSync** (SportSync Arena) is a full-stack, enterprise-grade sports tournament management and arena operations ecosystem. Engineered to streamline the entire tournament lifecycle—from dual-channel user authentication and team registration to dynamic match scheduling, live score broadcasting, sponsor collaborations, Razorpay payment processing, and automated prize pool distribution.
 
 ---
@@ -262,10 +267,13 @@ Arenasync/
 │   │   ├── App.jsx                 # Master application routing
 │   │   ├── main.jsx                # React DOM entry point
 │   │   └── index.css               # Base stylesheet
-│   ├── .env.example                # Frontend environment configuration
+│   ├── .env.example                # Frontend environment configuration template
+│   ├── .env.production             # Production environment variables
 │   ├── package.json                # Client dependencies & scripts
 │   ├── vercel.json                 # Vercel deployment & rewrite configuration
 │   └── vite.config.js              # Vite build setup
+├── package.json                    # Workspace root scripts & dev orchestration
+├── .gitignore                      # Master repository gitignore
 └── README.md                       # Master Documentation
 ```
 
@@ -397,7 +405,10 @@ JWT_SECRET=super_secret_jwt_passphrase_here
 # ==========================================
 # CORS & FRONTEND CLIENT
 # ==========================================
+# Local development:
 FRONTEND_URL=http://localhost:5173
+# Production (Render Dashboard):
+# FRONTEND_URL=https://arena-sync-iota.vercel.app
 
 # ==========================================
 # CLOUDINARY MEDIA CLOUD (Banners & Logos)
@@ -432,15 +443,28 @@ EMAIL_PASS=your_gmail_app_password
 FAST2SMS_API_KEY=your_fast2sms_api_key
 ```
 
-### Frontend Configuration (`Frontend/.env`)
+### Frontend Configuration
+
+#### Local Development (`Frontend/.env`)
 Create a `.env` file in the `Frontend/` directory:
 
 ```env
-# URL pointing to the running Express backend API
+# URL pointing to the running local Express backend API
 VITE_API_URL=http://localhost:5000/api
 
 # WebSocket URL for live Socket.IO connection
 VITE_SOCKET_URL=http://localhost:5000
+```
+
+#### Production Deployment (`Frontend/.env.production` or Vercel Environment Variables)
+For production builds on Vercel:
+
+```env
+# URL pointing to the deployed Render backend API
+VITE_API_URL=https://arenasync-reel.onrender.com/api
+
+# WebSocket URL for live Socket.IO connection
+VITE_SOCKET_URL=https://arenasync-reel.onrender.com
 ```
 
 ---
@@ -460,41 +484,54 @@ git clone https://github.com/Jainam249/ArenaSync.git
 cd ArenaSync
 ```
 
-### 3. Backend Setup
+### 3. Quickstart from Workspace Root (Recommended)
+You can manage the entire full-stack project directly from the root directory:
+
+```bash
+# 1. Install dependencies for both Backend and Frontend
+npm run install:all
+
+# 2. Run Backend API server (with auto-reload)
+npm run dev:backend
+
+# 3. In another terminal, run Frontend development server
+npm run dev:frontend
+
+# 4. Build Frontend for production
+npm run build
+```
+
+### 4. Running Services Individually
+
+#### Backend Setup (`cd Backend`)
 1. Open a terminal and navigate to the backend directory:
    ```bash
    cd Backend
-   ```
-2. Install server dependencies:
-   ```bash
    npm install
    ```
-3. Populate the `Backend/.env` file with your credentials (see template above).
-4. Start the backend server:
+2. Populate the `Backend/.env` file with your credentials (see template above).
+3. Start the backend server:
    ```bash
    # Production mode
    npm start
 
    # Development mode with nodemon auto-reload
-   npx nodemon server.js
+   npm run dev
    ```
    *The backend should output: `🚀 Server running on port 5000` and `✅ MongoDB Connected`.*
 
-### 4. Frontend Setup
+#### Frontend Setup (`cd Frontend`)
 1. In a new terminal window, navigate to the frontend directory:
    ```bash
    cd Frontend
-   ```
-2. Install client dependencies:
-   ```bash
    npm install
    ```
-3. Verify `Frontend/.env` has `VITE_API_URL=http://localhost:5000/api`.
-4. Launch the Vite development server:
+2. Verify `Frontend/.env` has `VITE_API_URL=http://localhost:5000/api`.
+3. Launch the Vite development server:
    ```bash
    npm run dev
    ```
-5. Open your browser and navigate to **`http://localhost:5173`**.
+4. Open your browser and navigate to **`http://localhost:5173`**.
 
 ---
 
@@ -518,33 +555,57 @@ node migrate.js
 
 ## 🌐 Deployment Guide
 
-### Frontend on Vercel
-The frontend includes a pre-configured `vercel.json` with SPA route rewrites:
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
+### ⚡ Frontend on Vercel
+- **Production URL**: [https://arena-sync-iota.vercel.app](https://arena-sync-iota.vercel.app)
+- **Pre-configured Rewrite**: `Frontend/vercel.json` provides SPA route rewrites for client-side routing.
+
 1. Push your repository to GitHub.
 2. Import the project into your [Vercel Dashboard](https://vercel.com).
 3. Set the **Root Directory** to `Frontend`.
-4. Configure environment variables in Vercel:
-   - `VITE_API_URL`: Your deployed backend URL (e.g. `https://api.yourdomain.com/api`)
-   - `VITE_SOCKET_URL`: Your deployed backend WebSocket root (e.g. `https://api.yourdomain.com`)
+4. Configure environment variables in Vercel (**Settings** ➔ **Environment Variables**):
+   | Key | Value | Purpose |
+   |---|---|---|
+   | `VITE_API_URL` | `https://arenasync-reel.onrender.com/api` | Express REST API endpoint |
+   | `VITE_SOCKET_URL` | `https://arenasync-reel.onrender.com` | Socket.IO WebSocket server root |
 5. Click **Deploy**.
 
-### Backend on Render / Railway / Cloud VPS
-1. Set the root directory to `Backend`.
-2. Set Build Command to `npm install`.
-3. Set Start Command to `node server.js`.
-4. Add all environment variables from `Backend/.env`.
-5. Ensure `FRONTEND_URL` matches your deployed Vercel domain (e.g., `https://arenasync-tau.vercel.app`) to ensure CORS headers permit requests.
+> [!TIP]
+> `Frontend/src/utils/axiosConfig.js` and `Frontend/src/utils/socket.js` include an automatic production fallback to `https://arenasync-reel.onrender.com`.
+
+---
+
+### 🚀 Backend on Render
+- **Production URL**: [https://arenasync-reel.onrender.com](https://arenasync-reel.onrender.com)
+- **Health Check**: `https://arenasync-reel.onrender.com/health`
+
+1. In the [Render Dashboard](https://dashboard.render.com), create a new **Web Service**.
+2. Connect your GitHub repository.
+3. Configure the service settings:
+   - **Root Directory**: `Backend`
+   - **Build Command**: `npm install`
+   - **Start Command**: `node server.js`
+4. Configure environment variables in Render (**Environment** tab):
+   | Key | Value | Purpose |
+   |---|---|---|
+   | `FRONTEND_URL` | `https://arena-sync-iota.vercel.app` | Production frontend URL |
+   | `MONGO_URI` | `mongodb+srv://...` | MongoDB Atlas connection string |
+   | `JWT_SECRET` | `your_secret_key` | JSON Web Token signing secret |
+   | `EMAIL_USER` | `shethmit5@gmail.com` | Google account email |
+   | `EMAIL_PASS` | `your_16_digit_app_password` | Google 16-character App Password |
+   | `EMAIL_FROM` | `shethmit5@gmail.com` | Sender email address |
+   | `CLOUDINARY_CLOUD_NAME` | `your_cloud_name` | Media Cloudinary account |
+   | `CLOUDINARY_API_KEY` | `your_api_key` | Media Cloudinary API Key |
+   | `CLOUDINARY_API_SECRET` | `your_api_secret` | Media Cloudinary API Secret |
+   | `RAZORPAY_KEY_ID` | `rzp_live_...` or `rzp_test_...` | Razorpay Client Key ID |
+   | `RAZORPAY_KEY_SECRET` | `your_razorpay_secret` | Razorpay Client Secret |
+   | `ORGANIZER_TOURNAMENT_CREATION_FEE` | `50000` | Tournament creation fee in paise |
+
+5. **MongoDB Atlas Whitelist**: In MongoDB Atlas (under **Security** ➔ **Network Access**), ensure **`0.0.0.0/0` (Allow access from anywhere)** is active so Render's cloud servers are permitted to connect.
+
+6. **Dynamic CORS Support**: The backend automatically validates and permits:
+   - Your primary production domain (`https://arena-sync-iota.vercel.app`)
+   - Any Vercel preview or branch deployment domain (`https://*.vercel.app`)
+   - Local development environments (`http://localhost:5173`, `http://127.0.0.1:5173`)
 
 ---
 
